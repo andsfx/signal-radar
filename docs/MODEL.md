@@ -1,6 +1,6 @@
-# Signal Radar - model radar-4
+# Signal Radar - model radar-5
 
-Dokumen ini menjelaskan model penilaian `radar-4` yang digunakan Signal Radar
+Dokumen ini menjelaskan model penilaian `radar-5` yang digunakan Signal Radar
 untuk memberi skor pada protokol pre-token berdasarkan snapshot DefiLlama yang
 tersegel. Semua angka diturunkan dari snapshot itu sendiri, bukan dari daftar
 nama protokol yang di-hardcode.
@@ -11,6 +11,12 @@ Model membangun regresi OLS log-log terhadap **anchors**: protokol yang sudah
 memiliki token trading (`mcap_usd` tidak null dan > 0), memiliki `tvl_usd > 0`,
 dan bukan kategori `CEX`. Anchors merepresentasikan pasar live yang sudah memberi
 harga token per unit TVL.
+
+Sebelum fit, anchors di-**winsorize**: protokol dengan rasio mcap/TVL di luar
+persentil 5-95 dibuang (pakai TVL anchor yang terurut). Setelah OLS fit, slope
+`b` di-clamp ke rentang `[0.3, 0.5]`, lalu intercept dikalibrasi sehingga median
+predicted anchor sama dengan median observed market cap (scale correction factor
+= medianObs/medianPred, dikalikan ke exp(a)). P10-P90 tetap dari sigma residual.
 
 Bentuk model:
 
@@ -119,9 +125,24 @@ breakeven_odds = 20 USD/bulan / implied_value_usd
 
 Klasifikasi verdict berdasarkan breakeven odds:
 
-- **Farm**: odds < 1% (implied value cukup besar relatif biaya)
-- **Marginal**: 1% ≤ odds < 5%
-- **Skip**: odds ≥ 5%
+- **Farm**: odds paling kecil — best 15-30% dari distribusi odds board (quantile farm_odds_quantile)
+- **Marginal**: odds berikutnya — hingga quantile marginal_odds_quantile (~50-65%)
+- **Skip**: sisanya
+
+Threshold dihitung dari distribusi odds semua board row: `farm_odds_max = odds[floor(0.30*N)]`,
+`marginal_odds_max = odds[floor(0.64*N)]`. Nilai ini di-export di radar data sebagai
+`verdict_thresholds` dan ditampilkan dashboard sebagai "Farm: best N% by breakeven odds (odds < X%)".
+
+## Guardrail kategori curated-AUM (radar-5)
+
+Kategori yang TVL-nya sebagian besar AUM terkelola (Risk Curators, Onchain Capital
+Allocator) mendapat:
+
+- Family multiplier di-dampen: `1 + (raw - 1) * 0.35`
+- Implied cap: `min(implied, 4_000_000 + TVL * 0.007)`
+
+Ini mencegah overshoot valuasi untuk protokol yang mengelola modal banyak tapi wilayah
+tokenizable-nya tidak sebesar TVL-nya.
 
 ## Band P10-P90
 

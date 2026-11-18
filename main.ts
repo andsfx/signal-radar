@@ -2,7 +2,7 @@
 //
 // The radar reads the sealed snapshot at /input/snapshot.json (or --input <file|dir>), fits an OLS
 // comps regression of ln(market cap) on ln(TVL) over the snapshot's live anchors, and scores every
-// protocol whose token does not exist yet with the radar-4 model in lib/model.ts. It writes the
+// protocol whose token does not exist yet with the radar-5 model in lib/model.ts. It writes the
 // ranked board to /output/board.json; the same board, farm steps included, is written as data.js
 // beside the dashboard, which /output/dashboard/ reads with no network: no framework, no fetch.
 // The program then copies dashboard/ and screenshots/ into /output and writes /output/dossier.json,
@@ -93,4 +93,4 @@ process.stdout.write(
     `signal radar: ${snapshot.protocols.length} protocols, ${snapshot.watchlist.length} on the watchlist, ${board.length} rows scored (${radar.early_size} early, ${radar.live_size} live set aside)\n` +
     `signal radar: wrote ${join(out, 'board.json')} (${boardBytes} bytes), ${join(out, 'data.js')} (${dataBytes} bytes), ${join(out, 'dashboard')} (3 files), ${join(out, 'screenshots')} (${shots.length} images) and ${join(out, 'dossier.json')}\n`,
 );
-process.stdout.write('radar-4 documented (docs/MODEL.md)\n');
+process.stdout.write('radar-5 documented (docs/MODEL.md)\n');

@@ -62,6 +62,16 @@ export interface ModelConstants {
   seasoning_decay_days: number;
   unknown_age_days: number;
   min_anchors: number;
+  /** Dampening applied to (family_multiplier - 1) for curated-AUM categories. */
+  curator_family_damp: number;
+  /** Base USD for implied-value cap on curated-AUM protocols. */
+  curator_cap_base_usd: number;
+  /** TVL rate for implied-value cap on curated-AUM protocols. */
+  curator_cap_tvl_rate: number;
+  /** Board quantile (ascending odds) for the Farm cutoff. */
+  farm_odds_quantile: number;
+  /** Board quantile (ascending odds) for the Marginal cutoff. */
+  marginal_odds_quantile: number;
 }
 
 export const MODEL: ModelConstants = {
@@ -77,10 +87,15 @@ export const MODEL: ModelConstants = {
   seasoning_decay_days: 24,
   unknown_age_days: 365,
   min_anchors: 10,
+  curator_family_damp: 0.35,
+  curator_cap_base_usd: 4_000_000,
+  curator_cap_tvl_rate: 0.007,
+  farm_odds_quantile: 0.30,
+  marginal_odds_quantile: 0.64,
 };
 
 /** The model's version label: the dashboard names it and the rules quote it. */
-export const MODEL_VERSION = 'radar-4';
+export const MODEL_VERSION = 'radar-5';
 
 /** How many live-token protocols the radar data carries for reference, by market cap. */
 export const LIVE_ROWS = 24;
@@ -168,6 +183,15 @@ export interface LiveRow {
   change_7d: number | null;
 }
 
+/** Board-wide verdict cutoffs derived from the breakeven-odds distribution (radar-5). */
+export interface VerdictThresholds {
+  farm_odds_max: number;
+  marginal_odds_max: number;
+  farm_count: number;
+  marginal_count: number;
+  skip_count: number;
+}
+
 /** Everything the dashboard renders, from the snapshot. */
 export interface RadarData {
   as_of: string;
@@ -182,6 +206,7 @@ export interface RadarData {
   board_size: number;
   early_size: number;
   live_size: number;
+  verdict_thresholds: VerdictThresholds;
   rows: RadarRow[];
   live: LiveRow[];
 }
@@ -335,15 +360,17 @@ export interface Score {
   age: number | null;
 }
 
-/** One protocol's score, given the snapshot's date, the comps fit and the family multipliers. */
+/** One protocol's full score under the comps regression and the family multipliers (radar-5 guardrails). */
 export function impliedValue(p: SnapshotProtocol, asOf: string, fit: FitResult, cats: Record<string, number>, model: ModelConstants = MODEL): Score {
   const fitBase = valueFit(p.tvl_usd, fit);
-  const famMult = cats[p.category ?? 'none'] ?? 1;
+  const rawFam = cats[p.category ?? 'none'] ?? 1;
+  const famMult = effectiveFamilyMultiplier(p.category, rawFam, model);
   const { pct: growthPct, mult: growthMult } = growthFactor(p, model);
   const { age, mult: seasonMult } = seasoningFactor(p, asOf, model);
-  const implied = Math.max(1, Math.round(fitBase * famMult * growthMult * seasonMult));
+  let implied = Math.max(1, Math.round(fitBase * famMult * growthMult * seasonMult));
+  implied = Math.max(1, Math.round(applyImpliedCap(p.category, p.tvl_usd, implied, model)));
   const p10 = Math.max(1, Math.round(implied * Math.exp(-1.28 * fit.sigma)));
-  const p90 = Math.round(implied * Math.exp(1.28 * fit.sigma));
+  const p90 = Math.max(1, Math.round(implied * Math.exp(1.28 * fit.sigma)));
   const odds = Math.round(oddsOf(implied, model) * 1e6) / 1e6;
   return { implied, p10, p90, odds, verdict: verdictFor(implied, model), fitBase, growthPct, growthMult, seasonMult, famMult, age };
 }
@@ -378,6 +405,26 @@ export function isEarlyRadar(p: SnapshotProtocol): boolean {
   );
 }
 
+/** Categories where reported TVL is largely managed/curated AUM and can overstate tokenizable value. */
+const CURATED_AUM_CATEGORIES = new Set(['Risk Curators', 'Onchain Capital Allocator']);
+
+/** radar-5: dampen the category-multiplier excess for curated-AUM categories. */
+function effectiveFamilyMultiplier(category: string | null, raw: number, model: ModelConstants = MODEL): number {
+  if (category !== null && CURATED_AUM_CATEGORIES.has(category)) {
+    return 1 + (raw - 1) * model.curator_family_damp;
+  }
+  return raw;
+}
+
+/** radar-5: cap implied value for curated-AUM categories (base + rate * TVL). */
+function applyImpliedCap(category: string | null, tvlUsd: number, implied: number, model: ModelConstants = MODEL): number {
+  if (category !== null && CURATED_AUM_CATEGORIES.has(category)) {
+    const cap = model.curator_cap_base_usd + tvlUsd * model.curator_cap_tvl_rate;
+    return Math.min(implied, cap);
+  }
+  return implied;
+}
+
 // ---------------------------------------------------------------- the board
 
 /** The snapshot's protocol by slug. */
@@ -389,7 +436,7 @@ function bySlug(protocols: SnapshotProtocol[]): Map<string, SnapshotProtocol> {
  * The protocols the board ranks, strongest first, with ranks 1..n: every watchlist slug (the floor,
  * whatever the filter says), then every pre-token protocol the early radar admits, by TVL.
  */
-export function buildBoard(snapshot: Snapshot, fit: FitResult, cats: Record<string, number>, model: ModelConstants = MODEL): BoardRow[] {
+export function buildBoard(snapshot: Snapshot, fit: FitResult, cats: Record<string, number>, model: ModelConstants = MODEL): { rows: BoardRow[]; thresholds: VerdictThresholds } {
   const index = bySlug(snapshot.protocols);
   const chosen = new Map<string, SnapshotProtocol>();
   for (const slug of snapshot.watchlist) {
@@ -403,8 +450,18 @@ export function buildBoard(snapshot: Snapshot, fit: FitResult, cats: Record<stri
 
   const scored = [...chosen.values()].map((p) => ({ p, s: impliedValue(p, snapshot.as_of, fit, cats, model) }));
   scored.sort((a, b) => b.s.implied - a.s.implied || (a.p.slug < b.p.slug ? -1 : a.p.slug > b.p.slug ? 1 : 0));
-  return scored.map((row, i) => {
-    const { p, s } = row;
+
+  const oddsAsc = scored.map((x) => x.s.odds).slice().sort((a, b) => a - b);
+  const n = oddsAsc.length || 1;
+  const q = (frac: number) => oddsAsc[Math.max(0, Math.min(n - 1, Math.round(frac * n) - 1))];
+  const farmOddsMax = q(model.farm_odds_quantile);
+  const marginalOddsMax = q(model.marginal_odds_quantile);
+  const verdictOf = (odds: number): Verdict => odds < farmOddsMax ? 'Farm' : odds < marginalOddsMax ? 'Marginal' : 'Skip';
+
+  let farm_count = 0, marginal_count = 0, skip_count = 0;
+  const rows = scored.map(({ p, s }, i) => {
+    const verdict = verdictOf(s.odds);
+    if (verdict === 'Farm') farm_count++; else if (verdict === 'Marginal') marginal_count++; else skip_count++;
     return {
       rank: i + 1,
       slug: p.slug,
@@ -417,13 +474,13 @@ export function buildBoard(snapshot: Snapshot, fit: FitResult, cats: Record<stri
       listed_at: p.listed_at,
       gecko_id: p.gecko_id,
       symbol: p.symbol,
-      token_status: 'pre-token',
+      token_status: 'pre-token' as const,
       age_days: s.age,
       implied_value_usd: s.implied,
       p10_usd: s.p10,
       p90_usd: s.p90,
       breakeven_odds_pct: s.odds * 100,
-      verdict: s.verdict,
+      verdict,
       model: {
         fit_base_usd: round4(s.fitBase),
         growth_pct: round4(s.growthPct),
@@ -432,9 +489,10 @@ export function buildBoard(snapshot: Snapshot, fit: FitResult, cats: Record<stri
         family_multiplier: round4(s.famMult),
         age_days: s.age,
       },
-      farm_steps: farmSteps(p, s, fit),
+      farm_steps: farmSteps(p, s, fit, verdict),
     };
   });
+  return { rows, thresholds: { farm_odds_max: farmOddsMax, marginal_odds_max: marginalOddsMax, farm_count, marginal_count, skip_count } };
 }
 
 // ---------------------------------------------------------------- farm plans
@@ -495,13 +553,13 @@ function actionFor(p: SnapshotProtocol, capital: number, chain: string, trend: s
  * from the protocol's own record (its category, first chain, TVL and age) and the model's own
  * numbers (implied value, P10, odds, verdict), never from a hand-written list of names.
  */
-export function farmSteps(p: SnapshotProtocol, s: Score, fit: FitResult): string[] {
+export function farmSteps(p: SnapshotProtocol, s: Score, fit: FitResult, verdict: Verdict = s.verdict): string[] {
   const chain = chainOf(p);
   const capital = capitalFor(p);
   const hold = holdDaysFor(s.age);
   const trend = trendLine(s.growthPct);
   const oddsPct = (s.odds * 100).toFixed(3);
-  const verdictLine = s.verdict === 'Farm' ? 'worth farming' : s.verdict === 'Marginal' ? 'farm small' : 'cost exceeds value today';
+  const verdictLine = verdict === 'Farm' ? 'worth farming' : verdict === 'Marginal' ? 'farm small' : 'cost exceeds value today';
   const steps: FarmStep[] = [
     {
       text: `The model prices ${p.name} at $${s.implied.toLocaleString('en-US')} (P10 $${s.p10.toLocaleString('en-US')}): odds ${oddsPct}% at $${MODEL.monthly_cost_usd}/month - ${verdictLine}.`,
@@ -509,7 +567,9 @@ export function farmSteps(p: SnapshotProtocol, s: Score, fit: FitResult): string
       time: '2 minutes',
     },
     {
-      text: actionFor(p, capital, chain, trend),
+      text: verdict === 'Skip'
+        ? 'Skip unless 7-day TVL growth sustains above +10%: the model prices the opportunity below its farming cost.'
+        : actionFor(p, capital, chain, trend),
       cost: `$${capital} of capital and about $${capital >= 150 ? 8 : 4} of gas`,
       time: '15 minutes to set up',
     },
@@ -589,7 +649,7 @@ export function radarRow(row: BoardRow): RadarRow {
 export function buildRadar(snapshot: Snapshot, model: ModelConstants = MODEL): { board: BoardRow[]; radar: RadarData } {
   const fit = fitComps(snapshot, model);
   const cats = familyMultipliers(snapshot, fit, model);
-  const board = buildBoard(snapshot, fit, cats, model);
+  const { rows: board, thresholds } = buildBoard(snapshot, fit, cats, model);
   const live = liveRows(snapshot);
   const watchlistSet = new Set(snapshot.watchlist);
   const radar: RadarData = {
@@ -605,6 +665,7 @@ export function buildRadar(snapshot: Snapshot, model: ModelConstants = MODEL): {
     board_size: board.length,
     early_size: board.filter((r) => !watchlistSet.has(r.slug)).length,
     live_size: liveAnchorCount(snapshot),
+    verdict_thresholds: thresholds,
     rows: board.map(radarRow),
     live,
   };

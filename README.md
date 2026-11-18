@@ -6,11 +6,9 @@
 
 Signal Radar is a token launch radar: it reads a sealed DefiLlama snapshot of 758 protocols, ranks the pre-token ones by an implied value computed from the snapshot's own figures, and ships an offline dashboard where every row carries the steps to farm that protocol.
 
-The implied-value model ("radar-3") anchors its category multipliers on the snapshot's live-token market: each category's median market-cap-to-TVL ratio, shrunk toward 1 by sample size, so no name is ever hardcoded. Growth is winsorized, maturity runs to 4 years, and extra chains add a small bonus.
-
 ## The model
 
-Signal Radar `radar-4` scores pre-token protocols with an OLS comps fit of `ln(mcap)` on `ln(tvl)` over live anchors, then adjusts with per-category family multipliers (median observed/predicted, clamped [0.3, 3], shrunk by `n/(n+8)`), a 7-day growth factor, and an age-based seasoning term. The implied value yields breakeven odds at $20/month to assign Farm/Marginal/Skip verdicts, plus P10-P90 bands at `exp(±1.28*sigma)`. See `docs/MODEL.md` for the full specification.
+Signal Radar `radar-5` scores pre-token protocols with a winsorized OLS comps fit of `ln(mcap)` on `ln(tvl)` over live anchors (slope clamped to [0.3, 0.5], intercept calibrated so the median predicted anchor equals the median traded market cap), then adjusts with per-category family multipliers (median observed/predicted, clamped [0.3, 3], shrunk by `n/(n+8)`), a 7-day growth factor, and an age-based seasoning term. Curated-AUM categories (Risk Curators, Onchain Capital Allocator) are dampened and capped so managed AUM does not overstate tokenizable value. Verdicts (Farm/Marginal/Skip) are assigned by board-wide breakeven-odds quantiles for a balanced, data-derived distribution (best ~30% Farm, next ~34% Marginal, the rest Skip), plus P10-P90 bands at `exp(±1.28*sigma)`. See `docs/MODEL.md` for the full specification.
 
 ## Run it
 
