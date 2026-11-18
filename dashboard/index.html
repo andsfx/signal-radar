@@ -3,12 +3,100 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Token Radar: pre-token protocols ranked by implied value</title>
+<title>Signal Radar - token launch radar</title>
 <link rel="stylesheet" href="app.css">
 </head>
 <body>
-<a class="skip" href="#board">Skip to the board</a>
-<main id="board" tabindex="-1" aria-busy="true"></main>
+<header class="head">
+  <div class="brand">
+    <div class="mark">SR</div>
+    <div class="titles">
+      <h1>Signal Radar</h1>
+      <p class="tagline">&gt; scanning 758 protocols for the tokens that do not exist yet</p>
+    </div>
+  </div>
+  <div class="meta">
+    <span class="chip"><i class="dot"></i>snapshot <b id="meta-asof">-</b></span>
+    <span class="chip">model <b id="meta-model">-</b></span>
+    <span class="chip">floor <b id="meta-floor">-</b></span>
+  </div>
+</header>
+
+<section class="stats" id="stats"></section>
+
+<section class="controls">
+  <input id="q" type="search" placeholder="search protocol, slug, category or chain">
+  <div class="chips" id="chips"></div>
+  <label class="wl-toggle"><input type="checkbox" id="wl-only"> watchlist only</label>
+</section>
+
+<section class="board-panel">
+  <div class="table-scroll">
+    <table class="board" id="board">
+      <thead>
+        <tr>
+          <th class="num" data-key="rank">#</th>
+          <th data-key="name">protocol</th>
+          <th data-key="category">category</th>
+          <th class="num" data-key="tvl_usd">tvl</th>
+          <th class="num" data-key="change_7d">7d</th>
+          <th class="num" data-key="age_days">age</th>
+          <th class="num" data-key="implied_value_usd">implied value</th>
+          <th class="mixcol">value mix</th>
+        </tr>
+      </thead>
+      <tbody id="rows"></tbody>
+    </table>
+  </div>
+  <div class="legend">
+    <span><i class="sw sw-wl"></i>watchlist row</span>
+    <span><i class="sw sw-tvl"></i>tvl base</span>
+    <span><i class="sw sw-grow"></i>growth</span>
+    <span><i class="sw sw-mature"></i>maturity</span>
+    <span><i class="sw sw-cat"></i>category</span>
+    <span><i class="sw sw-chain"></i>chains</span>
+    <span class="spacer"></span>
+    <span>click a row for its model and farm plan</span>
+  </div>
+  <div class="empty" id="empty" hidden>no protocol matches this filter</div>
+</section>
+
+<section class="formula">
+  <div class="formula-head">
+    <h2>value model</h2>
+    <span class="chip" id="model-version">-</span>
+  </div>
+  <div class="formula-grid" id="formula-grid"></div>
+  <p class="formula-note" id="formula-note"></p>
+</section>
+
+<div class="modal" id="modal" hidden>
+  <div class="modal-card">
+    <div class="modal-head">
+      <div>
+        <h2 id="d-name">-</h2>
+        <p id="d-sub">-</p>
+      </div>
+      <button class="x" id="d-close" aria-label="close">x</button>
+    </div>
+    <div class="d-stats" id="d-stats"></div>
+    <div class="d-grid">
+      <div>
+        <h3>value breakdown</h3>
+        <ul class="d-breakdown" id="d-breakdown"></ul>
+      </div>
+      <div>
+        <h3>how to farm</h3>
+        <ol class="d-steps" id="d-steps"></ol>
+      </div>
+    </div>
+  </div>
+</div>
+
+<footer class="foot">
+  <span id="foot-source">-</span>
+  <span>signal radar - implied value is the model's claim, never investment advice</span>
+</footer>
 <script src="../data.js"></script>
 <script src="app.js"></script>
 </body>
