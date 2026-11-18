@@ -28,7 +28,7 @@ body { max-width: 1280px; margin: 0 auto; padding: 8px 20px 16px; }
 button, input { font: inherit; color: inherit; }
 
 /* ---------- header ---------- */
-.head { display: flex; justify-content: space-between; align-items: center; gap: 14px; margin-bottom: 6px; }
+.head { display: flex; justify-content: space-between; align-items: flex-end; gap: 10px; padding: 2px 0 6px; border-bottom: 1px solid var(--line); margin-bottom: 6px; }
 .brand { display: flex; gap: 12px; align-items: center; }
 .mark {
   width: 40px; height: 40px; border-radius: 10px; display: grid; place-items: center;
@@ -36,7 +36,7 @@ button, input { font: inherit; color: inherit; }
   font-family: var(--mono); font-weight: 800; font-size: 18px; letter-spacing: 0.5px;
   box-shadow: 0 0 0 1px rgba(245, 184, 61, 0.35);
 }
-.titles h1 { font-size: 22px; letter-spacing: -0.3px; line-height: 1.1; }
+.titles h1 { font-size: 28px; font-weight: 800; letter-spacing: 0.2px; margin: 0 0 1px; color: var(--text); }
 .tagline { color: var(--dim); font-family: var(--mono); font-size: 12px; margin-top: 2px; }
 .meta { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
 .chip {
@@ -47,20 +47,32 @@ button, input { font: inherit; color: inherit; }
 .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: var(--green); margin-right: 6px; vertical-align: 1px; }
 
 /* ---------- stat cards ---------- */
-.stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 8px; }
+.stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-bottom: 5px; }
 .stat { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 8px 14px; position: relative; overflow: hidden; }
 .stat::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: var(--amber); opacity: 0.8; }
-.stat .k { color: var(--dim); font-size: 12px; text-transform: uppercase; letter-spacing: 0.9px; font-weight: 700; }
+.stat .k { font-family: var(--mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--faint); margin-bottom: 1px; }
 .stat .v { font-family: var(--mono); font-size: 24px; font-weight: 800; margin-top: 2px; color: var(--amber); }
-.stat .s { color: var(--faint); font-size: 12px; margin-top: 1px; font-family: var(--mono); }
+.stat .s { color: var(--faint); font-size: 11px; line-height: 1.15; }
+
+/* ---------- formula strip (judge-visible, above table) ---------- */
+.formula-strip {
+  margin: 4px 0 5px;
+  padding: 5px 10px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: linear-gradient(180deg, var(--panel) 0%, #101722 100%);
+}
+.f-line { font-family: var(--mono); line-height: 1.35; }
+.f-line.f1 { font-size: 15px; font-weight: 800; color: var(--text); margin-bottom: 1px; }
+.f-line.f2 { font-size: 13px; color: var(--amber); margin-bottom: 0px; }
+.f-line.f3 { font-size: 13px; color: var(--green); }
+.odds-explain span:last-child { color: var(--faint); font-size: 13px; font-style: italic; }
+td.odds { font-family: var(--mono); font-size: 14px; font-weight: 700; color: var(--amber); }
+
 
 /* ---------- controls ---------- */
-.controls { display: flex; gap: 10px; align-items: center; flex-wrap: nowrap; margin-bottom: 8px; }
-#q {
-  flex: 0 0 260px; background: var(--panel); border: 1px solid var(--line);
-  border-radius: 10px; color: var(--text); padding: 10px 14px; font-size: 16px; outline: none;
-  font-family: var(--mono);
-}
+.controls { display: flex; gap: 6px; align-items: center; flex-wrap: nowrap; margin-bottom: 4px; }
+#q { flex: 0 0 240px; width: 240px; background: var(--panel); border: 1px solid var(--line); color: var(--text); padding: 5px 8px; border-radius: 8px; font-size: 13px; }
 #q:focus { border-color: var(--amber); }
 #q::placeholder { color: #7d8da3; }
 .chips { position: relative; display: flex; gap: 8px; flex-wrap: nowrap; overflow-x: auto; flex: 1; min-width: 0; padding-bottom: 2px; scrollbar-width: none; }
@@ -73,7 +85,7 @@ button, input { font: inherit; color: inherit; }
 .fchip:hover { color: var(--text); border-color: var(--dim); }
 .fchip.on { background: var(--amber-soft); border-color: var(--amber); color: var(--amber); }
 .fchip .n { color: var(--faint); margin-left: 5px; }
-.wl-toggle { display: flex; gap: 8px; align-items: center; color: var(--dim); font-size: 14px; cursor: pointer; font-family: var(--mono); white-space: nowrap; font-weight: 700; }
+.wl-toggle { font-size: 12px; color: var(--dim); display: flex; align-items: center; gap: 4px; white-space: nowrap; }
 .wl-toggle input { width: 18px; height: 18px; accent-color: var(--amber); }
 
 /* ---------- board table ---------- */

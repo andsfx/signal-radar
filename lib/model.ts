@@ -95,7 +95,7 @@ export const MODEL: ModelConstants = {
 };
 
 /** The model's version label: the dashboard names it and the rules quote it. */
-export const MODEL_VERSION = 'radar-5';
+export const MODEL_VERSION = 'radar-6';
 
 /** How many live-token protocols the radar data carries for reference, by market cap. */
 export const LIVE_ROWS = 24;
@@ -114,6 +114,7 @@ export interface FitResult {
   b: number;
   sigma: number;
   fallback: boolean;
+  loo_median_miss_pct: number;
 }
 
 /** The verdict a row's implied value earns by its breakeven odds. */
@@ -207,6 +208,7 @@ export interface RadarData {
   early_size: number;
   live_size: number;
   verdict_thresholds: VerdictThresholds;
+  verdict_counts: { farm: number; marginal: number; skip: number };
   rows: RadarRow[];
   live: LiveRow[];
 }
@@ -279,15 +281,51 @@ export function anchorProtocols(snapshot: Snapshot): SnapshotProtocol[] {
   return snapshot.protocols.filter((p) => p.mcap_usd !== null && p.mcap_usd > 0 && p.tvl_usd > 0 && p.category !== 'CEX');
 }
 
+/** Compute leave-one-out median miss percentage on anchors using incremental OLS sums. */
+export function leaveOneOutMiss(anchors: { tvl_usd: number; mcap_usd: number | null }[]): number {
+  const n = anchors.length;
+  if (n < 3) return 0;
+  const xs = anchors.map((p) => Math.log(p.tvl_usd));
+  const ys = anchors.map((p) => Math.log(p.mcap_usd!));
+  // precompute totals
+  let sx = 0, sy = 0, sxx = 0, sxy = 0;
+  for (let i = 0; i < n; i++) {
+    const x = xs[i]!, y = ys[i]!;
+    sx += x; sy += y; sxx += x*x; sxy += x*y;
+  }
+  const misses: number[] = [];
+  for (let i = 0; i < n; i++) {
+    // remove contribution of anchor i
+    const x_i = xs[i]!, y_i = ys[i]!;
+    const n1 = n - 1;
+    const sx1 = sx - x_i;
+    const sy1 = sy - y_i;
+    const sxx1 = sxx - x_i*x_i;
+    const sxy1 = sxy - x_i*y_i;
+    const denom = n1 * sxx1 - sx1 * sx1;
+    if (denom === 0) { misses.push(0); continue; }
+    const b = (n1 * sxy1 - sx1 * sy1) / denom;
+    const a = (sy1 - b * sx1) / n1;
+    const pred = Math.exp(a + b * x_i);
+    const obs = anchors[i]!.mcap_usd!;
+    const miss = Math.abs(pred - obs) / obs;
+    misses.push(miss);
+  }
+  misses.sort((a,b)=>a-b);
+  const medianMiss = misses[Math.floor(misses.length/2)] ?? 0;
+  return medianMiss * 100;
+}
+
 /** Fit ln(mcap) on ln(tvl) over the live anchors; the fallback line when too few anchors exist. */
 export function fitComps(snapshot: Snapshot, model: ModelConstants = MODEL): FitResult {
   const anchors = anchorProtocols(snapshot);
-  if (anchors.length < model.min_anchors) return { n: anchors.length, a: 0, b: 1, sigma: 0, fallback: true };
+  if (anchors.length < model.min_anchors) return { n: anchors.length, a: 0, b: 1, sigma: 0, fallback: true, loo_median_miss_pct: 0 };
   const xs = anchors.map((p) => Math.log(p.tvl_usd));
   const ys = anchors.map((p) => Math.log(p.mcap_usd!));
   const { a, b, sigma } = olsFit(xs, ys);
-  if (!Number.isFinite(a) || !Number.isFinite(b)) return { n: anchors.length, a: 0, b: 1, sigma: 0, fallback: true };
-  return { n: anchors.length, a, b, sigma: Number.isFinite(sigma) ? sigma : 0, fallback: false };
+  if (!Number.isFinite(a) || !Number.isFinite(b)) return { n: anchors.length, a: 0, b: 1, sigma: 0, fallback: true, loo_median_miss_pct: 0 };
+  const loo = leaveOneOutMiss(anchors);
+  return { n: anchors.length, a, b, sigma: Number.isFinite(sigma) ? sigma : 0, fallback: false, loo_median_miss_pct: loo };
 }
 
 /**
@@ -666,6 +704,7 @@ export function buildRadar(snapshot: Snapshot, model: ModelConstants = MODEL): {
     early_size: board.filter((r) => !watchlistSet.has(r.slug)).length,
     live_size: liveAnchorCount(snapshot),
     verdict_thresholds: thresholds,
+    verdict_counts: { farm: thresholds.farm_count, marginal: thresholds.marginal_count, skip: thresholds.skip_count },
     rows: board.map(radarRow),
     live,
   };

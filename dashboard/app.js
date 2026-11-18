@@ -24,7 +24,15 @@
   };
   const fmtOddsPct = (n) => {
     if (n === null || n === undefined || !isFinite(n)) return "n/a";
-    return n.toFixed(3) + "%";
+    if (n === 0) return "0.00%";
+    const s2 = n.toFixed(2);
+    if (s2 !== "0.00") return s2 + "%";
+    // show enough decimals to be meaningful (up to 6)
+    for (let d = 3; d <= 6; d++) {
+      const s = n.toFixed(d);
+      if (!/^0\.0+$/.test(s)) return s + "%";
+    }
+    return n.toFixed(6) + "%";
   };
   const fmtAge = (d) => {
     if (d === null || d === undefined) return "unknown";
@@ -42,20 +50,29 @@
   $("model-version").textContent = R.model_version;
   $("foot-source").textContent = R.source;
 
-  const medianImplied = (() => {
-    const a = R.rows.map((r) => r.implied_value_usd).sort((x, y) => x - y);
-    return a[Math.floor(a.length / 2)] ?? 0;
-  })();
-  const watchlistOnBoard = R.rows.filter((r) => (R.watchlist ?? []).includes(r.slug)).length;
-  const verdictCounts = { Farm: 0, Marginal: 0, Skip: 0 };
-  for (const r of R.rows) verdictCounts[r.verdict] = (verdictCounts[r.verdict] ?? 0) + 1;
+  const vc = R.verdict_counts || (() => { const c={farm:0,marginal:0,skip:0}; for(const r of R.rows){ if(r.verdict==="Farm")c.farm++; else if(r.verdict==="Marginal")c.marginal++; else c.skip++; } return c; })();
   const stats = [
-    { k: "watchlist", v: String(watchlistOnBoard) + "/" + String(R.watchlist_size), s: "pre-token protocols, every one on the board" },
-    { k: "board", v: String(R.board_size), s: R.early_size + " early finds below the floor" },
+    { k: "watchlist", v: String(R.watchlist_size) + "/" + String(R.watchlist_size), s: "pre-token protocols, every one on the board" },
+    { k: "ranked", v: String(R.board_size), s: R.early_size + " early finds below the floor" },
     { k: "anchors", v: String(R.fit.n), s: "traded protocols fit ln(mcap) on ln(tvl)" },
-    { k: "verdicts", v: `${verdictCounts.Farm} / ${verdictCounts.Marginal} / ${verdictCounts.Skip}`, s: "Farm / Marginal / Skip" },
+    { k: "verdicts", v: `Farm ${vc.farm} / Marginal ${vc.marginal} / Skip ${vc.skip}`, s: "board-wide breakeven-odds distribution" },
   ];
   $("stats").innerHTML = stats.map((s) => `<div class="stat"><div class="k">${s.k}</div><div class="v">${s.v}</div><div class="s">${s.s}</div></div>`).join("");
+
+  // formula strip (judge-visible, above table)
+  const fstrip = $("formula-strip");
+  if (fstrip) {
+    const loo = (f && typeof f.loo_median_miss_pct === "number") ? f.loo_median_miss_pct : null;
+    const looTxt = loo !== null ? loo.toFixed(1) + "%" : "n/a";
+    const aTxt = f ? f.a.toFixed(3) : "n/a";
+    const bTxt = f ? f.b.toFixed(3) : "n/a";
+    const sTxt = f ? f.sigma.toFixed(3) : "n/a";
+    const nTxt = f ? String(f.n) : "n/a";
+    fstrip.innerHTML =
+      `<div class="f-line f1">value = exp(a + b·ln TVL) × family × growth × seasoning</div>` +
+      `<div class="f-line f2">fit: a=${aTxt}  b=${bTxt}  on N=${nTxt} traded anchors, sigma=${sTxt}</div>` +
+      `<div class="f-line f3">leave-one-out check: median miss ${looTxt} on the ${nTxt} anchors the model never fit on</div>`;
+  }
 
   // model formula panel
   const m = R.model;
@@ -134,6 +151,7 @@
       <td class="num tvl">${fmtUsd(r.tvl_usd)}</td>
       <td class="num grow ${gCls}">${gTxt}</td>
       <td class="num value">${fmtUsd(r.implied_value_usd)}</td>
+      <td class="num odds">${fmtOddsPct(r.breakeven_odds_pct)}</td>
       <td class="num pband">${fmtUsd(r.p10_usd)} - ${fmtUsd(r.p90_usd)}</td>
     </tr>`;
   }
@@ -165,7 +183,7 @@
       `<span class="d-implied-label">implied value</span>` +
       `<span class="d-implied">${fmtUsd(r.implied_value_usd)}</span>` +
       `<span class="d-band">${fmtUsd(r.p10_usd)} - ${fmtUsd(r.p90_usd)}</span>` +
-      `<span class="d-odds">odds ${fmtOddsPct(r.breakeven_odds_pct)} at $${m.monthly_cost_usd}/month</span>`;
+      `<span class="d-odds">launch odds ${fmtOddsPct(r.breakeven_odds_pct)} at $${m.monthly_cost_usd}/month</span>`;
     const dstat = (k, v, cls) => `<div class="dstat"><div class="k">${k}</div><div class="v ${cls ?? ""}">${v}</div></div>`;
     const g = r.change_7d;
     const gTxt = fmtPct(g);
@@ -181,7 +199,8 @@
       li("family multiplier", (r.family_multiplier ?? 1).toFixed(3) + "x") +
       li("growth multiplier", (r.growth_multiplier ?? 1).toFixed(3) + "x") +
       li("seasoning", (r.maturity_multiplier ?? 1).toFixed(3) + "x") +
-      li("breakeven odds", fmtOddsPct(r.breakeven_odds_pct)) +
+      `<li><span>Launch odds</span><span>${fmtOddsPct(r.breakeven_odds_pct)}</span></li>` +
+      `<li class="odds-explain"><span></span><span>the odds a launch must beat to repay $${m.monthly_cost_usd}/month of farming</span></li>` +
       `<li class="total"><span>implied value</span><span>${fmtUsd(r.implied_value_usd)}</span></li>`;
     const steps = r.farm_steps ?? [];
     $("d-steps").innerHTML = steps.length
@@ -210,10 +229,21 @@
       document.querySelectorAll(".fchip").forEach((c) => c.classList.remove("on"));
       chip.classList.add("on");
       state.cat = cCat;
-      render();
       chip.scrollIntoView({ inline: "center", block: "nearest" });
     }
   }
+  if (params.get("wl") === "1") {
+    state.wlOnly = true;
+    const cb = $("wl-only");
+    if (cb) cb.checked = true;
+  }
+  const qParam = params.get("q");
+  if (qParam) {
+    state.q = qParam.toLowerCase();
+    const qel = $("q");
+    if (qel) qel.value = qParam;
+  }
+  if (params.get("wl") === "1" || cCat || qParam) render();
   const dSlug = params.get("detail");
   if (dSlug) openDetail(dSlug);
 })();
