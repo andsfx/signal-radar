@@ -40,9 +40,10 @@
           <th data-key="category">category</th>
           <th class="num" data-key="tvl_usd">tvl</th>
           <th class="num" data-key="change_7d">7d</th>
-          <th class="num" data-key="age_days">age</th>
           <th class="num" data-key="implied_value_usd">implied value</th>
-          <th class="mixcol">value mix</th>
+          <th class="num" data-key="breakeven_odds_pct">breakeven odds</th>
+          <th class="num">p10-p90</th>
+          <th data-key="verdict">verdict</th>
         </tr>
       </thead>
       <tbody id="rows"></tbody>
@@ -50,11 +51,9 @@
   </div>
   <div class="legend">
     <span><i class="sw sw-wl"></i>watchlist row</span>
-    <span><i class="sw sw-tvl"></i>tvl base</span>
-    <span><i class="sw sw-grow"></i>growth</span>
-    <span><i class="sw sw-mature"></i>maturity</span>
-    <span><i class="sw sw-cat"></i>category</span>
-    <span><i class="sw sw-chain"></i>chains</span>
+    <span><i class="sw sw-farm"></i>farm</span>
+    <span><i class="sw sw-marg"></i>marginal</span>
+    <span><i class="sw sw-skip"></i>skip</span>
     <span class="spacer"></span>
     <span>click a row for its model and farm plan</span>
   </div>
@@ -79,6 +78,7 @@
       </div>
       <button class="x" id="d-close" aria-label="close">x</button>
     </div>
+    <div class="d-verdict" id="d-verdict"></div>
     <div class="d-stats" id="d-stats"></div>
     <div class="d-grid">
       <div>

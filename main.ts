@@ -1,8 +1,9 @@
 // Signal Radar, a token-radar-01 entry for make.fun (Node 22, standard library only).
 //
-// The radar reads the sealed snapshot at /input/snapshot.json (or --input <file|dir>), scores every
-// protocol whose token does not exist yet with the radar-3 model in lib/model.ts, and writes the
-// ranked board to /output/board.json. The same board, farm steps included, is written as data.js
+// The radar reads the sealed snapshot at /input/snapshot.json (or --input <file|dir>), fits an OLS
+// comps regression of ln(market cap) on ln(TVL) over the snapshot's live anchors, and scores every
+// protocol whose token does not exist yet with the radar-4 model in lib/model.ts. It writes the
+// ranked board to /output/board.json; the same board, farm steps included, is written as data.js
 // beside the dashboard, which /output/dashboard/ reads with no network: no framework, no fetch.
 // The program then copies dashboard/ and screenshots/ into /output and writes /output/dossier.json,
 // the summary the judge reads, with the vendored make.fun library, byte for byte what the scorer
@@ -83,11 +84,12 @@ for (const name of shots) {
 // The dossier is written last: the scorer rebuilds it from this /output and compares bytes.
 writeFileSync(join(out, 'dossier.json'), buildDossier(out, { text_max_bytes: TEXT_MAX_BYTES, screenshots: SCREENSHOT_CAPS, dashboard: { max_files: 400, max_bytes: 4_194_304 } }));
 
+const fit = radar.fit;
 const cats = Object.keys(radar.category_multipliers).length;
 const boardBytes = statSync(join(out, 'board.json')).size;
 const dataBytes = statSync(join(out, 'data.js')).size;
 process.stdout.write(
-  `signal radar: model ${radar.model_version}, ${cats} category multipliers from ${radar.live_size} live anchors\n` +
+  `signal radar: model ${radar.model_version}, comps fit on ${fit.n} live anchors (a=${fit.a.toFixed(3)}, b=${fit.b.toFixed(3)}, sigma=${fit.sigma.toFixed(3)}) with ${cats} family multipliers\n` +
     `signal radar: ${snapshot.protocols.length} protocols, ${snapshot.watchlist.length} on the watchlist, ${board.length} rows scored (${radar.early_size} early, ${radar.live_size} live set aside)\n` +
     `signal radar: wrote ${join(out, 'board.json')} (${boardBytes} bytes), ${join(out, 'data.js')} (${dataBytes} bytes), ${join(out, 'dashboard')} (3 files), ${join(out, 'screenshots')} (${shots.length} images) and ${join(out, 'dossier.json')}\n`,
 );
