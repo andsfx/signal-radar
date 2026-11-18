@@ -8,6 +8,10 @@ Signal Radar is a token launch radar: it reads a sealed DefiLlama snapshot of 75
 
 The implied-value model ("radar-3") anchors its category multipliers on the snapshot's live-token market: each category's median market-cap-to-TVL ratio, shrunk toward 1 by sample size, so no name is ever hardcoded. Growth is winsorized, maturity runs to 4 years, and extra chains add a small bonus.
 
+## The model
+
+Signal Radar `radar-4` scores pre-token protocols with an OLS comps fit of `ln(mcap)` on `ln(tvl)` over live anchors, then adjusts with per-category family multipliers (median observed/predicted, clamped [0.3, 3], shrunk by `n/(n+8)`), a 7-day growth factor, and an age-based seasoning term. The implied value yields breakeven odds at $20/month to assign Farm/Marginal/Skip verdicts, plus P10-P90 bands at `exp(±1.28*sigma)`. See `docs/MODEL.md` for the full specification.
+
 ## Run it
 
 ```sh
