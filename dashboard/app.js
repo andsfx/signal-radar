@@ -50,6 +50,8 @@
   $("model-version").textContent = R.model_version;
   $("foot-source").textContent = R.source;
 
+  const f = R.fit;
+  const m = R.model;
   const vc = R.verdict_counts || (() => { const c={farm:0,marginal:0,skip:0}; for(const r of R.rows){ if(r.verdict==="Farm")c.farm++; else if(r.verdict==="Marginal")c.marginal++; else c.skip++; } return c; })();
   const stats = [
     { k: "watchlist", v: String(R.watchlist_size) + "/" + String(R.watchlist_size), s: "pre-token protocols, every one on the board" },
@@ -63,7 +65,7 @@
   const fstrip = $("formula-strip");
   if (fstrip) {
     const loo = (f && typeof f.loo_median_miss_pct === "number") ? f.loo_median_miss_pct : null;
-    const looTxt = loo !== null ? loo.toFixed(1) + "%" : "n/a";
+    const looTxt = loo !== null ? (1 + loo / 100).toFixed(2) + "x" : "n/a";
     const aTxt = f ? f.a.toFixed(3) : "n/a";
     const bTxt = f ? f.b.toFixed(3) : "n/a";
     const sTxt = f ? f.sigma.toFixed(3) : "n/a";
@@ -71,12 +73,10 @@
     fstrip.innerHTML =
       `<div class="f-line f1">value = exp(a + b·ln TVL) × family × growth × seasoning</div>` +
       `<div class="f-line f2">fit: a=${aTxt}  b=${bTxt}  on N=${nTxt} traded anchors, sigma=${sTxt}</div>` +
-      `<div class="f-line f3">leave-one-out check: median miss ${looTxt} on the ${nTxt} anchors the model never fit on</div>`;
+      `<div class="f-line f3">leave-one-out check: median miss ${looTxt} (out-of-sample, the anchors the model never fit on)</div>`;
   }
 
   // model formula panel
-  const m = R.model;
-  const f = R.fit;
   const t = R.verdict_thresholds;
   const topCats = Object.entries(R.category_multipliers ?? {})
     .sort((a, b) => Math.abs(b[1] - 1) - Math.abs(a[1] - 1))
