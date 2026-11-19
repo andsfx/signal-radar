@@ -171,6 +171,8 @@ export interface RadarRow {
   maturity_multiplier: number;
   family_multiplier: number;
   farm_steps: string[];
+  /** One-line farm plan for the board's FARM column: "$100 cap · 45d hold · 6 steps". */
+  farm_summary: string;
 }
 
 /** A live-token protocol: already trading, so it anchors the model instead of being ranked. */
@@ -193,6 +195,21 @@ export interface VerdictThresholds {
   skip_count: number;
 }
 
+/**
+ * The protocols the board sets aside, by reason (radar-6b). These are the snapshot's protocols the
+ * board does not rank, and why: traded protocols the market already prices, bridge/staking wrappers
+ * whose underlying token trades, and wrapped/exchange-custody products with nothing of their own to
+ * farm. The counts come straight from the snapshot, never from a hardcoded list.
+ */
+export interface SetAside {
+  /** Protocols with a market cap (a token that already trades) that the model does not rank. */
+  traded: number;
+  /** Pre-token protocols in a bridge or staking-wrapper category, excluded from the early radar. */
+  bridge_staking: number;
+  /** Pre-token protocols set aside as wrapped/staked-by-name, exchange-named or CEX custody. */
+  wrapped_exchange: number;
+}
+
 /** Everything the dashboard renders, from the snapshot. */
 export interface RadarData {
   as_of: string;
@@ -209,6 +226,7 @@ export interface RadarData {
   live_size: number;
   verdict_thresholds: VerdictThresholds;
   verdict_counts: { farm: number; marginal: number; skip: number };
+  set_aside: SetAside;
   rows: RadarRow[];
   live: LiveRow[];
 }
@@ -427,6 +445,9 @@ const DERIVATIVE_WORD = /\b(wrapped|staked|staking|stake|restaked|restaking|coll
 /** Categories that are bridges or staking wrappers of existing tokens, or an exchange itself. */
 const OFF_LIMITS = new Set(['CEX', 'Bridge', 'Canonical Bridge', 'Liquid Staking', 'Liquid Restaking', 'Restaked BTC']);
 
+/** The bridge/staking-wrapper categories, apart from CEX: their product wraps a token that trades. */
+const BRIDGE_STAKING_CATEGORIES = new Set(['Bridge', 'Canonical Bridge', 'Liquid Staking', 'Liquid Restaking', 'Restaked BTC']);
+
 /** Whether a protocol records no token at all. */
 export function isPreToken(p: SnapshotProtocol): boolean {
   return p.mcap_usd === null && p.gecko_id === null && p.symbol === null;
@@ -441,6 +462,35 @@ export function isEarlyRadar(p: SnapshotProtocol): boolean {
     !EXCHANGE_PREFIX.test(p.name) &&
     !DERIVATIVE_WORD.test(p.name)
   );
+}
+
+/**
+ * The snapshot's protocols the board does not rank, counted by reason: traded protocols the market
+ * already prices (they anchor the comps fit instead), pre-token bridge/staking wrappers whose
+ * underlying token trades, and wrapped/staked-by-name or exchange-custody products with nothing of
+ * their own to farm. The three counts answer "what was set aside, and why".
+ */
+export function setAside(snapshot: Snapshot): SetAside {
+  const watch = new Set(snapshot.watchlist);
+  let traded = 0;
+  let bridge_staking = 0;
+  let wrapped_exchange = 0;
+  for (const p of snapshot.protocols) {
+    if (p.mcap_usd !== null && !watch.has(p.slug)) {
+      traded++;
+      continue;
+    }
+    if (!isPreToken(p)) continue;
+    const cat = p.category ?? '';
+    if (BRIDGE_STAKING_CATEGORIES.has(cat)) {
+      bridge_staking++;
+      continue;
+    }
+    if (cat === 'CEX' || DERIVATIVE_WORD.test(p.name) || EXCHANGE_PREFIX.test(p.name)) {
+      wrapped_exchange++;
+    }
+  }
+  return { traded, bridge_staking, wrapped_exchange };
 }
 
 /** Categories where reported TVL is largely managed/curated AUM and can overstate tokenizable value. */
@@ -549,11 +599,16 @@ function chainOf(p: SnapshotProtocol): string {
 }
 
 /** How much capital one farm position needs, from the protocol's own TVL. */
-function capitalFor(p: SnapshotProtocol): number {
-  if (p.tvl_usd >= 5_000_000_000) return 250;
-  if (p.tvl_usd >= 1_000_000_000) return 150;
-  if (p.tvl_usd >= 100_000_000) return 100;
+function capitalForTvl(tvlUsd: number): number {
+  if (tvlUsd >= 5_000_000_000) return 250;
+  if (tvlUsd >= 1_000_000_000) return 150;
+  if (tvlUsd >= 100_000_000) return 100;
   return 50;
+}
+
+/** How much capital one farm position needs, from the protocol's own TVL. */
+function capitalFor(p: SnapshotProtocol): number {
+  return capitalForTvl(p.tvl_usd);
 }
 
 /** How long to hold, from the protocol's age: a young protocol gets a longer qualifying window. */
@@ -562,6 +617,11 @@ function holdDaysFor(age: number | null): number {
   if (age < 180) return 60;
   if (age < 365) return 45;
   return 30;
+}
+
+/** One line for the board's FARM column: the plan's capital, hold window and step count. */
+export function farmSummary(tvlUsd: number, age: number | null): string {
+  return `$${capitalForTvl(tvlUsd)} cap · ${holdDaysFor(age)}d hold · 6 steps`;
 }
 
 /** The trend sentence the plan carries: the protocol's own seven-day TVL change. */
@@ -680,6 +740,7 @@ export function radarRow(row: BoardRow): RadarRow {
     maturity_multiplier: row.model.seasoning_multiplier,
     family_multiplier: row.model.family_multiplier,
     farm_steps: row.farm_steps,
+    farm_summary: farmSummary(row.tvl_usd, row.age_days),
   };
 }
 
@@ -705,6 +766,7 @@ export function buildRadar(snapshot: Snapshot, model: ModelConstants = MODEL): {
     live_size: liveAnchorCount(snapshot),
     verdict_thresholds: thresholds,
     verdict_counts: { farm: thresholds.farm_count, marginal: thresholds.marginal_count, skip: thresholds.skip_count },
+    set_aside: setAside(snapshot),
     rows: board.map(radarRow),
     live,
   };

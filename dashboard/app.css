@@ -65,10 +65,38 @@ button, input { font: inherit; color: inherit; }
 .f-line { font-family: var(--mono); line-height: 1.35; }
 .f-line.f1 { font-size: 15px; font-weight: 800; color: var(--text); margin-bottom: 1px; }
 .f-line.f2 { font-size: 13px; color: var(--amber); margin-bottom: 0px; }
-.f-line.f3 { font-size: 13px; color: var(--green); }
+.f-line.f3 { font-size: 16px; color: var(--text); }
+.f-line.f3 .loo-label { color: var(--amber); font-weight: 800; }
+.f-line.f3 .loo-num { color: var(--text); font-weight: 800; }
+.f-line.f3 .loo-note { color: var(--dim); font-size: 13px; }
 .odds-explain span:last-child { color: var(--faint); font-size: 13px; font-style: italic; }
 td.odds { font-family: var(--mono); font-size: 14px; font-weight: 700; color: var(--amber); }
 
+/* ---------- set-aside panel (radar-6b): what the board excludes and why ---------- */
+.set-aside {
+  margin: 0 0 5px;
+  padding: 6px 10px;
+  border: 1px solid var(--line-soft);
+  border-radius: 12px;
+  background: var(--panel);
+}
+.sa-head {
+  font-family: var(--mono); font-size: 12px; font-weight: 800; letter-spacing: 1px;
+  color: var(--amber); text-transform: uppercase; margin-bottom: 4px;
+}
+.sa-head .sa-sub { color: var(--dim); font-weight: 600; text-transform: none; letter-spacing: 0; margin-left: 6px; font-size: 12px; }
+.sa-chips { display: flex; gap: 8px; flex-wrap: wrap; }
+.sa-chip {
+  display: inline-flex; align-items: baseline; gap: 6px;
+  background: #0c1118; border: 1px solid var(--line); border-radius: 8px;
+  padding: 5px 10px; font-size: 13px; color: var(--text); font-family: var(--mono); white-space: nowrap;
+}
+.sa-chip .sa-ico {
+  display: inline-grid; place-items: center; width: 16px; height: 16px; border-radius: 4px;
+  background: var(--amber-soft); color: var(--amber); font-style: normal; font-weight: 800; font-size: 12px;
+}
+.sa-chip b { color: var(--amber); font-size: 15px; font-weight: 800; }
+.sa-chip .sa-why { color: var(--dim); font-size: 12px; }
 
 /* ---------- controls ---------- */
 .controls { display: flex; gap: 6px; align-items: center; flex-wrap: nowrap; margin-bottom: 4px; }
@@ -93,7 +121,7 @@ td.odds { font-family: var(--mono); font-size: 14px; font-weight: 700; color: va
 .table-scroll { overflow-y: auto; max-height: 524px; scrollbar-width: thin; scrollbar-color: var(--line) #0a0e13; }
 table.board { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 15px; }
 thead th {
-  height: 38px; padding: 0 14px; vertical-align: middle;
+  height: 38px; padding: 0 10px; vertical-align: middle;
   text-align: left; color: var(--dim); font-weight: 800; font-size: 13px;
   text-transform: uppercase; letter-spacing: 0.9px;
   border-bottom: 2px solid var(--line); cursor: pointer; user-select: none; white-space: nowrap;
@@ -106,7 +134,7 @@ thead th.sort-asc::after { content: " ^"; color: var(--amber); }
 tbody tr { height: 60px; }
 tbody tr:nth-child(odd) { background: var(--panel); }
 tbody tr:nth-child(even) { background: var(--panel-2); }
-tbody td { padding: 0 14px; border-bottom: 1px solid var(--line-soft); vertical-align: middle; }
+tbody td { padding: 0 10px; border-bottom: 1px solid var(--line-soft); vertical-align: middle; }
 tbody tr { cursor: pointer; }
 tbody tr:hover { background: var(--amber-soft); }
 tbody tr.wl { box-shadow: inset 4px 0 0 var(--blue); }
@@ -121,8 +149,9 @@ td.grow { font-size: 20px; font-weight: 800; }
 td.grow.up { color: var(--green); }
 td.grow.down { color: var(--red); }
 td.grow.flat { color: var(--faint); }
-td.value { font-size: 30px; font-weight: 800; color: var(--amber); }
-td.pband { color: var(--dim); font-size: 16px; font-weight: 600; }
+td.value { font-size: 27px; font-weight: 800; color: var(--amber); }
+td.farm { color: var(--green); font-size: 13px; font-weight: 700; line-height: 1.25; }
+td.pband { color: var(--dim); font-size: 14px; font-weight: 600; }
 .verdict { display: inline-block; text-align: center; min-width: 78px; padding: 4px 12px; border-radius: 8px; font-size: 13px; font-weight: 800; font-family: var(--mono); letter-spacing: 0.5px; text-transform: uppercase; border: 2px solid; }
 .verdict.farm { color: var(--green); border-color: var(--green); background: var(--green-soft); }
 .verdict.marginal { color: var(--amber); border-color: var(--amber); background: var(--amber-soft); }

@@ -73,7 +73,22 @@
     fstrip.innerHTML =
       `<div class="f-line f1">value = exp(a + b·ln TVL) × family × growth × seasoning</div>` +
       `<div class="f-line f2">fit: a=${aTxt}  b=${bTxt}  on N=${nTxt} traded anchors, sigma=${sTxt}</div>` +
-      `<div class="f-line f3">leave-one-out check: median miss ${looTxt} (out-of-sample, the anchors the model never fit on)</div>`;
+      `<div class="f-line f3"><span class="loo-label">leave-one-out check:</span> median miss <span class="loo-num">${looTxt}</span> <span class="loo-note">(out-of-sample, the anchors the model never fit on)</span></div>`;
+  }
+
+  // set-aside panel (radar-6b): the snapshot's protocols the board does not rank, and why
+  const aside = $("set-aside");
+  if (aside) {
+    const sa = R.set_aside;
+    if (sa) {
+      aside.innerHTML =
+        `<div class="sa-head">SET ASIDE <span class="sa-sub">what the board does not rank, and why</span></div>` +
+        `<div class="sa-chips">` +
+        `<span class="sa-chip"><i class="sa-ico">=</i><b>${sa.traded}</b> traded <span class="sa-why">ranked by market, not by model</span></span>` +
+        `<span class="sa-chip"><i class="sa-ico">=</i><b>${sa.bridge_staking}</b> bridges &amp; staking <span class="sa-why">token already trades</span></span>` +
+        `<span class="sa-chip"><i class="sa-ico">=</i><b>${sa.wrapped_exchange}</b> wrapped or exchange-custody <span class="sa-why">nothing to farm</span></span>` +
+        `</div>`;
+    }
   }
 
   // model formula panel
@@ -151,6 +166,7 @@
       <td class="num tvl">${fmtUsd(r.tvl_usd)}</td>
       <td class="num grow ${gCls}">${gTxt}</td>
       <td class="num value">${fmtUsd(r.implied_value_usd)}</td>
+      <td class="num farm">${esc(r.farm_summary ?? "")}</td>
       <td class="num odds">${fmtOddsPct(r.breakeven_odds_pct)}</td>
       <td class="num pband">${fmtUsd(r.p10_usd)} - ${fmtUsd(r.p90_usd)}</td>
     </tr>`;
